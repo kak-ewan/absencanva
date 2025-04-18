@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Kehadiran Siswa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateX(200%);
+            transition: transform 0.3s ease-in-out;
+        }
+        .notification.show {
+            transform: translateX(0);
+        }
+        .success {
+            background-color: #10b981;
+        }
+        .error {
+            background-color: #ef4444;
+        }
+        .warning {
+            background-color: #f59e0b;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        .btn {
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .tab-active {
+            border-bottom: 3px solid #3b82f6;
+            color: #3b82f6;
+        }
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        table th, table td {
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .rfid-animation {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.1);
+            animation: pulse 1.5s infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+            70% { transform: scale(1); box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div id="app">
+        <!-- Notification -->
+        <div id="notification" class="notification hidden">
+            <span id="notification-message"></span>
+        </div>
+
+        <!-- Login Screen -->
+        <div id="login-screen" class="flex items-center justify-center min-h-screen p-4">
+            <div class="card p-8 w-full max-w-md">
+                <div class="text-center mb-8">
+                    <h1 class="text-3xl font-bold text-gray-800">Sistem Kehadiran Siswa</h1>
+                    <p class="text-gray-600 mt-2">Silakan masuk untuk melanjutkan</p>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                        <input type="text" id="username" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input type="password" id="password" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="pt-2">
+                        <button id="login-btn" class="btn w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md">
+                            Masuk
+                        </button>
+                    </div>
+                    <div class="pt-2">
+                        <button id="attendance-mode-btn" class="btn w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md">
+                            Mode Absensi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Panel -->
+        <div id="admin-panel" class="hidden">
+            <nav class="bg-white shadow-sm">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex justify-between h-16">
+                        <div class="flex">
+                            <div class="flex-shrink-0 flex items-center">
+                                <h1 class="text-xl font-bold text-blue-600">Sistem Kehadiran Siswa</h1>
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <span id="admin-name" class="text-sm font-medium text-gray-700 mr-4">Admin</span>
+                            <button id="logout-btn" class="btn bg-red-500 hover:bg-red-600 text-white text-sm py-1 px-3 rounded-md">
+                                Logout
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <div class="flex border-b border-gray-200 mb-6">
+                    <button class="tab-btn tab-active px-4 py-2 font-medium text-sm" data-tab="students">Data Siswa</button>
+                    <button class="tab-btn px-4 py-2 font-medium text-sm" data-tab="settings">Pengaturan</button>
+                    <button class="tab-btn px-4 py-2 font-medium text-sm" data-tab="holidays">Hari Libur</button>
+                    <button class="tab-btn px-4 py-2 font-medium text-sm" data-tab="reports">Rekapitulasi</button>
+                </div>
+
+                <!-- Students Tab -->
+                <div id="students-tab" class="tab-content">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800">Data Siswa</h2>
+                        <button id="add-student-btn" class="btn bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                            </svg>
+                            Tambah Siswa
+                        </button>
+                    </div>
+
+                    <div class="mb-4 flex">
+                        <input type="text" id="student-search" placeholder="Cari siswa..." class="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full max-w-xs">
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg overflow-hidden">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIS</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kelas</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="students-table-body">
+                                <!-- Data siswa akan dimuat di sini -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div id="settings-tab" class="tab-content hidden">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-6">Pengaturan Absensi</h2>
+                    
+                    <div class="card p-6 mb-6">
+                        <h3 class="text-lg font-medium text-gray-800 mb-4">Jam Masuk & Toleransi Keterlambatan</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="entry-time" class="block text-sm font-medium text-gray-700 mb-1">Jam Masuk</label>
+                                <input type="time" id="entry-time" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="late-tolerance" class="block text-sm font-medium text-gray-700 mb-1">Toleransi Keterlambatan (menit)</label>
+                                <input type="number" id="late-tolerance" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card p-6 mb-6">
+                        <h3 class="text-lg font-medium text-gray-800 mb-4">Hari Aktif Sekolah</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="flex items-center">
+                                <input type="checkbox" id="monday" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label for="monday" class="ml-2 block text-sm text-gray-700">Senin</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="tuesday" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label for="tuesday" class="ml-2 block text-sm text-gray-700">Selasa</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="wednesday" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label for="wednesday" class="ml-2 block text-sm text-gray-700">Rabu</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="thursday" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label for="thursday" class="ml-2 block text-sm text-gray-700">Kamis</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="friday" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label for="friday" class="ml-2 block text-sm text-gray-700">Jumat</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="saturday" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label for="saturday" class="ml-2 block text-sm text-gray-700">Sabtu</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="sunday" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label for="sunday" class="ml-2 block text-sm text-gray-700">Minggu</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button id="save-settings-btn" class="btn bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-md">
+                            Simpan Pengaturan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Holidays Tab -->
+                <div id="holidays-tab" class="tab-content hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-semibold text-gray-800">Hari Libur</h2>
+                        <button id="add-holiday-btn" class="btn bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                            </svg>
+                            Tambah Hari Libur
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg overflow-hidden">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keterangan</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="holidays-table-body">
+                                <!-- Data hari libur akan dimuat di sini -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Reports Tab -->
+                <div id="reports-tab" class="tab-content hidden">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-6">Rekapitulasi Kehadiran</h2>
+                    
+                    <div class="card p-6 mb-6">
+                        <h3 class="text-lg font-medium text-gray-800 mb-4">Filter Laporan</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label for="report-class" class="block text-sm font-medium text-gray-700 mb-1">Kelas</label>
+                                <select id="report-class" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="all">Semua Kelas</option>
+                                    <!-- Opsi kelas akan dimuat di sini -->
+                                </select>
+                            </div>
+                            <div>
+                                <label for="report-start-date" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Mulai</label>
+                                <input type="date" id="report-start-date" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="report-end-date" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Akhir</label>
+                                <input type="date" id="report-end-date" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        <div class="mt-4 flex justify-end">
+                            <button id="generate-report-btn" class="btn bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md">
+                                Tampilkan Laporan
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="report-results" class="hidden">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-medium text-gray-800">Hasil Laporan</h3>
+                            <button id="export-report-btn" class="btn bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-md flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M3 17a1 1 0 001 1h12a1 1 0 001-1V9.293L11.707 4H4a1 1 0 00-1 1v12zm9-11v-.586l3.293 3.293H12V6z" clip-rule="evenodd" />
+                                </svg>
+                                Export Excel
+                            </button>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full bg-white rounded-lg overflow-hidden">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIS</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kelas</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hadir</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Terlambat</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tidak Hadir</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="report-table-body">
+                                    <!-- Data laporan akan dimuat di sini -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance Panel -->
+        <div id="attendance-panel" class="hidden min-h-screen flex flex-col">
+            <nav class="bg-blue-600 text-white shadow-md">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex justify-between h-16">
+                        <div class="flex items-center">
+                            <h1 class="text-xl font-bold">Sistem Absensi Siswa</h1>
+                        </div>
+                        <div class="flex items-center">
+                            <span id="current-time" class="text-lg font-medium mr-4"></span>
+                            <button id="attendance-logout-btn" class="btn bg-red-500 hover:bg-red-600 text-white text-sm py-1 px-3 rounded-md">
+                                Kembali ke Login
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="flex-grow flex flex-col items-center justify-center p-4">
+                <div class="card p-8 w-full max-w-md text-center">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">Absensi Siswa</h2>
+                    
+                    <div class="mb-8">
+                        <div class="text-center mb-4">
+                            <div class="mx-auto rfid-animation">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="text-gray-600 mb-2">Silakan scan kartu RFID Anda</p>
+                        <div class="relative">
+                            <input type="text" id="rfid-input" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="RFID ID" autofocus>
+                            <button id="scan-btn" class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded-md text-sm">
+                                Scan
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="attendance-result" class="hidden">
+                        <div class="mb-4">
+                            <img id="student-photo" class="w-24 h-24 rounded-full mx-auto mb-2 bg-gray-200" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24'%3E%3Cpath fill='%23cccccc' d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" alt="Student Photo">
+                            <h3 id="student-name" class="text-xl font-semibold text-gray-800">-</h3>
+                            <p id="student-class" class="text-gray-600">-</p>
+                        </div>
+                        <div id="attendance-status" class="py-3 px-4 rounded-md text-center font-medium">
+                            <!-- Status akan ditampilkan di sini -->
+                        </div>
+                        <p id="attendance-time" class="text-gray-600 mt-2">-</p>
+                    </div>
+                </div>
+
+                <div class="mt-8 w-full max-w-md">
+                    <div class="card p-4">
+                        <h3 class="text-lg font-medium text-gray-800 mb-2">Absensi Terakhir</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead>
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Waktu</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-attendance-body">
+                                    <!-- Data absensi terakhir akan dimuat di sini -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modals -->
+        <!-- Add/Edit Student Modal -->
+        <div id="student-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="student-modal-title" class="text-lg font-medium text-gray-800">Tambah Siswa</h3>
+                    <button class="modal-close text-gray-400 hover:text-gray-500">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <form id="student-form" class="space-y-4">
+                    <input type="hidden" id="student-id">
+                    <div>
+                        <label for="student-rfid" class="block text-sm font-medium text-gray-700 mb-1">RFID</label>
+                        <input type="text" id="student-rfid" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="student-nis" class="block text-sm font-medium text-gray-700 mb-1">NIS</label>
+                        <input type="text" id="student-nis" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="student-name-input" class="block text-sm font-medium text-gray-700 mb-1">Nama</label>
+                        <input type="text" id="student-name-input" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="student-class-input" class="block text-sm font-medium text-gray-700 mb-1">Kelas</label>
+                        <input type="text" id="student-class-input" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="flex justify-end pt-4">
+                        <button type="button" class="btn modal-close bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded-md mr-2">
+                            Batal
+                        </button>
+                        <button type="submit" class="btn bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md">
+                            Simpan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add/Edit Holiday Modal -->
+        <div id="holiday-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="holiday-modal-title" class="text-lg font-medium text-gray-800">Tambah Hari Libur</h3>
+                    <button class="modal-close text-gray-400 hover:text-gray-500">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <form id="holiday-form" class="space-y-4">
+                    <input type="hidden" id="holiday-id">
+                    <div>
+                        <label for="holiday-date" class="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
+                        <input type="date" id="holiday-date" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="holiday-description" class="block text-sm font-medium text-gray-700 mb-1">Keterangan</label>
+                        <input type="text" id="holiday-description" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="flex justify-end pt-4">
+                        <button type="button" class="btn modal-close bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded-md mr-2">
+                            Batal
+                        </button>
+                        <button type="submit" class="btn bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md">
+                            Simpan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Confirmation Modal -->
+        <div id="confirm-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm">
+                <div class="mb-4">
+                    <h3 class="text-lg font-medium text-gray-800">Konfirmasi</h3>
+                    <p id="confirm-message" class="text-gray-600 mt-2">Apakah Anda yakin ingin menghapus data ini?</p>
+                </div>
+                <div class="flex justify-end">
+                    <button id="cancel-confirm" class="btn bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded-md mr-2">
+                        Batal
+                    </button>
+                    <button id="confirm-action" class="btn bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md">
+                        Ya, Hapus
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // URL Web App (ganti dengan URL deployment Anda)
+        let webAppUrl = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
+        
+        // Variabel global
+        let currentTab = 'students';
+        let confirmCallback = null;
+        let isAttendanceMode = false;
+
+        // Inisialisasi aplikasi
+        function initApp() {
+            // Deteksi otomatis URL saat dijalankan di Google Apps Script
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
+                webAppUrl = window.location.origin + window.location.pathname.replace(/\/dev|exec$/,'');
+            }
+            
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Load initial data
+            loadSettings();
+            loadStudents();
+            loadHolidays();
+            
+            // Initialize clock for attendance panel
+            initClock();
+        }
+        
+        // Setup semua event listener
+        function setupEventListeners() {
+            // Login button
+            document.getElementById('login-btn').addEventListener('click', handleLogin);
+            
+            // Attendance mode button
+            document.getElementById('attendance-mode-btn').addEventListener('click', () => {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('attendance-panel').classList.remove('hidden');
+                initClock();
+                loadRecentAttendance();
+            });
+            
+            // Logout buttons
+            document.getElementById('logout-btn').addEventListener('click', handleLogout);
+            document.getElementById('attendance-logout-btn').addEventListener('click', handleLogout);
+            
+            // Tab navigation
+            document.querySelectorAll('.tab-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const tab = button.getAttribute('data-tab');
+                    switchTab(tab);
+                });
+            });
+            
+            // Student management
+            document.getElementById('add-student-btn').addEventListener('click', () => {
+                openStudentModal();
+            });
+            document.getElementById('student-form').addEventListener('submit', handleStudentSubmit);
+            
+            // Holiday management
+            document.getElementById('add-holiday-btn').addEventListener('click', () => {
+                openHolidayModal();
+            });
+            document.getElementById('holiday-form').addEventListener('submit', handleHolidaySubmit);
+            
+            // Settings
+            document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
+            
+            // Reports
+            document.getElementById('generate-report-btn').addEventListener('click', generateReport);
+            document.getElementById('export-report-btn').addEventListener('click', exportReport);
+            
+            // Attendance
+            document.getElementById('scan-btn').addEventListener('click', handleAttendanceScan);
+            document.getElementById('rfid-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleAttendanceScan();
+                }
+            });
+            
+            // Modal close buttons
+            document.querySelectorAll('.modal-close').forEach(button => {
+                button.addEventListener('click', () => {
+                    closeAllModals();
+                });
+            });
+            
+            // Confirmation modal
+            document.getElementById('cancel-confirm').addEventListener('click', () => {
+                document.getElementById('confirm-modal').classList.add('hidden');
+            });
+            document.getElementById('confirm-action').addEventListener('click', () => {
+                if (confirmCallback) confirmCallback();
+                document.getElementById('confirm-modal').classList.add('hidden');
+            });
+            
+            // Search functionality
+            document.getElementById('student-search').addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                filterStudents(searchTerm);
+            });
+        }
+        
+        // Fungsi untuk memanggil endpoint GS
+        async function callServer(endpoint, data = {}) {
+            try {
+                // Jika dijalankan di Google Apps Script
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    return new Promise((resolve, reject) => {
+                        google.script.run
+                            .withSuccessHandler(resolve)
+                            .withFailureHandler(reject)
+                            [endpoint](data);
+                    });
+                }
+                
+                // Jika dijalankan di luar Google Apps Script
+                const response = await fetch(`${webAppUrl}?action=${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data),
+                });
+                
+                if (!response.ok) throw new Error('Network response was not ok');
+                return await response.json();
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification(`Error: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+        
+        // Fungsi untuk menampilkan notifikasi
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            const messageEl = document.getElementById('notification-message');
+            
+            messageEl.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.remove('hidden');
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.classList.add('hidden'), 300);
+            }, 3000);
+        }
+        
+        // Fungsi login
+        async function handleLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await callServer('adminLogin', { username, password });
+                
+                if (response.success) {
+                    showNotification('Login berhasil!', 'success');
+                    document.getElementById('login-screen').classList.add('hidden');
+                    document.getElementById('admin-panel').classList.remove('hidden');
+                    switchTab('students');
+                } else {
+                    showNotification('Username atau password salah!', 'error');
+                }
+            } catch (error) {
+                showNotification('Gagal melakukan login', 'error');
+            }
+        }
+        
+        // Fungsi logout
+        function handleLogout() {
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('admin-panel').classList.add('hidden');
+            document.getElementById('attendance-panel').classList.add('hidden');
+            
+            // Clear login form
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        }
+        
+        // Fungsi untuk berpindah tab
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(button => {
+                if (button.getAttribute('data-tab') === tab) {
+                    button.classList.add('tab-active');
+                } else {
+                    button.classList.remove('tab-active');
+                }
+            });
+            
+            // Update tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                if (content.id === `${tab}-tab`) {
+                    content.classList.remove('hidden');
+                } else {
+                    content.classList.add('hidden');
+                }
+            });
+            
+            // Load tab-specific data
+            if (tab === 'students') {
+                loadStudents();
+            } else if (tab === 'holidays') {
+                loadHolidays();
+            } else if (tab === 'settings') {
+                loadSettings();
+            } else if (tab === 'reports') {
+                initReports();
+            }
+        }
+        
+        // Fungsi untuk memuat data siswa
+        async function loadStudents() {
+            try {
+                const response = await callServer('getStudents');
+                if (response.success) {
+                    const tableBody = document.getElementById('students-table-body');
+                    tableBody.innerHTML = '';
+                    
+                    response.data.forEach((student, index) => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td class="px-6 py-4 whitespace-nowrap">${index + 1}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">${student.rfid || '-'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">${student.nis || '-'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">${student.name || '-'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">${student.class || '-'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <button class="text-blue-600 hover:text-blue-800 mr-3" onclick="editStudent(${student.id})">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                    </svg>
+                                </button>
+                                <button class="text-red-600 hover:text-red-800" onclick="deleteStudent(${student.id})">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                    
+                    updateClassOptions();
+                }
+            } catch (error) {
+                showNotification('Gagal memuat data siswa', 'error');
+            }
+        }
+        
+        // ... (tambahkan semua fungsi JavaScript lainnya yang diperlukan) ...
+        
+        // Jalankan inisialisasi saat DOM siap
+        document.addEventListener('DOMContentLoaded', initApp);
+        
+        // Fungsi global untuk aksi siswa
+        window.editStudent = function(id) {
+            callServer('getStudents').then(response => {
+                if (response.success) {
+                    const student = response.data.find(s => s.id === id);
+                    if (student) {
+                        openStudentModal(student);
+                    }
+                }
+            });
+        };
+        
+        window.deleteStudent = function(id) {
+            document.getElementById('confirm-message').textContent = 'Apakah Anda yakin ingin menghapus data siswa ini?';
+            confirmCallback = async () => {
+                try {
+                    const response = await callServer('deleteStudent', { id });
+                    if (response.success) {
+                        showNotification(response.message, 'success');
+                        loadStudents();
+                    } else {
+                        showNotification(response.message, 'error');
+                    }
+                } catch (error) {
+                    showNotification('Gagal menghapus data siswa', 'error');
+                }
+            };
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        };
+    </script>
+</body>
+</html>
